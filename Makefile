@@ -1,8 +1,8 @@
 #--------------------------------------------------
 # C.O. says, this is a Makefile
 #--------------------------------------------------
-MCU=atmega64
-PROJ=scoreboard
+MCU = atmega64
+PROJ = scoreboard-remote
 PROGRAMMER = avrisp2
 #PROGRAMMER = jtag2isp
 
@@ -10,7 +10,7 @@ SECTIONS =
 
 # files
 #--------------------------------------------------
-SOURCES = main ste2007 symbols display keyboard
+SOURCES = main ste2007 symbols display keyboard hc-05
 BUILDDIR = build
 BINDIR = bin
 FUSEDIR = fuse

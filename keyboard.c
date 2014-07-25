@@ -37,12 +37,6 @@ volatile uint16_t keyboard_poll;
 static uint8_t check_key(enum _keys);
 
 //--------------------------------------------------
-uint8_t get_keys(void)/*{{{*/
-{
-return active_keys;
-}
-/*}}}*/
-//--------------------------------------------------
 void keyboard_init(void)/*{{{*/
 {
 for(uint8_t i=0; i<KEY_COUNT; i++)
@@ -64,6 +58,12 @@ TIFR  |= (1<<OCF0);
 OCR0   = 0x7F;
 TCCR0  = (1<<WGM01) | (1<<CS02) | (1<<CS01) | (1<<CS00);
 TIMSK |= (1<<OCIE0);
+}
+/*}}}*/
+//--------------------------------------------------
+uint8_t get_keys(void)/*{{{*/
+{
+return active_keys;
 }
 /*}}}*/
 //--------------------------------------------------

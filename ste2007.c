@@ -25,8 +25,7 @@ PORTE |= (1<<PE2) | (1<<PE3);
 DDRB |= (1<<PB1) | (1<<PB2) | (1<<PB4);
 DDRE |= (1<<PE2) | (1<<PE3);
 
-// turn led on
-//PORTB |= (1<<PB4);
+// turn led off
 PORTB &= ~(1<<PB4);
 
 // drop clock
@@ -150,6 +149,15 @@ void ste_render()/*{{{*/
 {
 for(uint16_t i=0; i<96*9; i++)
     send_byte(0x01, framebuffer[i]);
+}
+/*}}}*/
+//--------------------------------------------------
+void ste_light(uint8_t on)/*{{{*/
+{
+if(on != 0)
+    PORTB |= (1<<PB4);
+else
+    PORTB &= ~(1<<PB4);
 }
 /*}}}*/
 //--------------------------------------------------

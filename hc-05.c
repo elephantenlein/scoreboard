@@ -16,13 +16,22 @@
 #define HC_AT_MODE   PORTD |=  (1<<PD5)
 
 //--------------------------------------------------
+const uint8_t max_at_try=5;
+const uint8_t max_bind_try=3;
+
+//--------------------------------------------------
+static volatile enum hc05_state state;
+
+//--------------------------------------------------
 volatile char hc05_buff[HC_BUFF_SIZE];
 volatile uint8_t buff_fill, hc05_i;
 
 //--------------------------------------------------
-void hc05_init(void)/*{{{*/
+enum hc05_state hc05_init(void)/*{{{*/
 {
 uint8_t i=0;
+state=HC05_OFFLINE;
+
 for(i=0; i<HC_BUFF_SIZE; i++)
     hc05_buff[i]=0;
 buff_fill=0;
@@ -32,95 +41,142 @@ hc05_i=0;
 DDRD |= (1<<DDD3) | (1<<DDD5) | (1<<DDD7);
 PORTD |= (1<<PD2) | (1<<PD3) | (1<<PD7);
 
-// uart 38400 8N1
+// start out at 38400 8N1
 UBRR1L = 12;
 UBRR1H = 0;
 
+UCSR1B = (1<<TXEN1)  | (1<<RXEN1);
 UCSR1C = (1<<UCSZ10) | (1<<UCSZ11);
-UCSR1B = (1<<TXEN1)  | (1<<RXEN1)  | (1<<RXCIE1);
 
-// reset interrupts
-UCSR1A |= (1<<RXC1);
-
-HC_COMM_MODE;
-
-// init proc
+_delay_ms(10);
 HC_SET_RESET;
 _delay_ms(10);
 HC_CLR_RESET;
-_delay_ms(10);
+_delay_ms(1000);
 
 HC_AT_MODE;
-hc05_send("AT\r\n");
-_delay_ms(600);
+for(i=0; i<max_at_try; i++)/*{{{*/
+    {
+    _delay_ms(100);
 
-hc05_send("AT\r\n");
-hc05_recv();
-if(hc05_buff[0] != 'O' ||
-   hc05_buff[1] != 'K')
-    HALT;
+    hc05_send("AT\r\n");
+    if(!hc05_recv())
+	{
+	if(i % 2 == 0)
+	    { // try 9600
+	    UBRR1L = 51;
+	    UBRR1H = 0;
+	    }
+	else
+	    { // try 38400
+	    UBRR1L = 12;
+	    UBRR1H = 0;
+	    }
+	continue;
+	}
 
+    if(hc05_buff[0] == 'O' &&
+       hc05_buff[1] == 'K')
+	break;
+    }
+
+if(i >= max_at_try)
+    return HC05_OFFLINE;
+/*}}}*/
+/*
 hc05_send("AT+VERSION?\r\n");
-hc05_recv();
-hc05_recv();
+if(!hc05_recv())
+    return HC05_OFFLINE;
+if(!hc05_recv())
+    return HC05_OFFLINE;
+    */
 
-hc05_send("AT+INIT\r\n");
-hc05_recv();
+//DBG1_SET;
+hc05_send("AT+UART=9600,0,0\r\n");
+if(!hc05_recv())
+    return HC05_OFFLINE;
 
-hc05_send("AT+NAME=\"Scoreboard\"\r\n");
-hc05_recv();
+hc05_send("AT+NAME=\"Scoreboard-remote\"\r\n");
+if(!hc05_recv())
+    return HC05_OFFLINE;
 
 hc05_send("AT+RMAAD\r\n");
-hc05_recv();
-
-hc05_send("AT+UART=38400,0,0\r\n");
-hc05_recv();
+if(!hc05_recv())
+    return HC05_OFFLINE;
 
 hc05_send("AT+ROLE=1\r\n");
-hc05_recv();
+if(!hc05_recv())
+    return HC05_OFFLINE;
 
 hc05_send("AT+CMODE=1\r\n");
-hc05_recv();
-
-hc05_send("AT+IAC=9e8b33\r\n");
-hc05_recv();
-
-hc05_send("AT+CLASS=0\r\n");
-hc05_recv();
-
-hc05_send("AT+INQM=1,5,48\r\n");
-hc05_recv();
-
-HC_COMM_MODE;
-_delay_ms(10);
-
-hc05_send("AT+STATE?\r\n");
-hc05_recv();
-hc05_recv();
+if(!hc05_recv())
+    return HC05_OFFLINE;
 
 // pc
 //hc05_send("AT+BIND=001b,10,002624\r\n");
 // E61
 //hc05_send("AT+BIND=0012,d1,0bb16a\r\n");
 // galaxy s
-hc05_send("AT+BIND=0cdf,a4,78e7a4\r\n");
-hc05_recv();
+//hc05_send("AT+BIND=0cdf,a4,78e7a4\r\n");
+// scoreboard-board
+/*
+for(i=0; i<max_bind_try; i++)
+    {
+    hc05_send("AT+BIND=0014,02,280224\r\n");
+    if(!hc05_recv())
+	return HC05_OFFLINE;
+    if(hc05_recv())
+	return HC05_PAIRED;
+    }
 
 hc05_send("AT+BIND?\r\n");
-hc05_recv();
-hc05_recv();
-
-hc05_send("AT+STATE?\r\n");
-hc05_recv();
-hc05_recv();
+if(!hc05_recv())
+    return HC05_OFFLINE;
+if(!hc05_recv())
+    return HC05_OFFLINE;
+    */
 
 // pc
 //hc05_send("AT+PAIR=001b,10,002624,20\r\n");
 // E61
 //hc05_send("AT+PAIR=0012,d1,0bb16a,20\r\n");
 // galaxy s
-hc05_send("AT+PAIR=0cdf,a4,78e7a4,20\r\n");
-hc05_recv();
+//hc05_send("AT+PAIR=0cdf,a4,78e7a4,20\r\n");
+// scoreboard-board
+/*
+hc05_send("AT+PAIR=0014,02,280224\r\n");
+if(!hc05_recv())
+    return HC05_OFFLINE;
+
+if(hc05_buff[0] == 'O')
+    {
+    HC_COMM_MODE;
+
+    // switch to 9600 now
+    UBRR1L = 51;
+    UBRR1H = 0;
+    return HC05_PAIRED;
+    }
+    */
+
+// stay in HC_AT_MODE
+state=HC05_NOT_PAIRED;
+return HC05_NOT_PAIRED;
+}
+/*}}}*/
+//--------------------------------------------------
+enum hc05_state hc05_task(void)/*{{{*/
+{
+if(state == HC05_NOT_PAIRED)
+    {
+    hc05_send("AT+PAIR=0014,02,280224,1\r\n");
+    hc05_recv();
+
+    state=HC05_PAIRED;
+    HC_COMM_MODE;
+    }
+
+return state;
 }
 /*}}}*/
 //--------------------------------------------------
@@ -129,7 +185,6 @@ void hc05_send(char *msg)/*{{{*/
 uint8_t i=0;
 
 buff_fill=0;
-hc05_i=0;
 do
     {
     while(~UCSR1A & (1<<UDRE1)) {};
@@ -142,18 +197,40 @@ do
 while(1);
 
 UCSR1A |= (1<<TXC1);
-while(~UCSR1A & (1<<TXC1)) {};
+while(~UCSR1A & (1<<TXC1)) {}
+
+hc05_i=0;
 }
 /*}}}*/
 //--------------------------------------------------
-void hc05_recv(void)/*{{{*/
+void hc05_put(char c)/*{{{*/
 {
+while(~UCSR1A & (1<<UDRE1)) {};
+UDR1=c;
+}
+/*}}}*/
+//--------------------------------------------------
+bool hc05_recv(void)/*{{{*/
+{
+const uint16_t max_to=1000;
+
 uint8_t rcv;
+uint16_t to;
 
 UCSR1A |= (1<<RXC1);
 while(1)
     {
-    while(~UCSR1A & (1<<RXC1)) {};
+    to=0;
+    while(~UCSR1A & (1<<RXC1))
+	{
+	_delay_us(500);
+	to++;
+	if(to >= max_to)
+	    break;
+	};
+
+    if(to >= max_to)
+	break;
 
     rcv=UDR1;
     hc05_buff[hc05_i]=rcv;
@@ -167,30 +244,11 @@ while(1)
 	break;
 	}
     }
-}
-/*}}}*/
-//--------------------------------------------------
-uint8_t hc05_rcv_complete(void)/*{{{*/
-{
-if(buff_fill != 0)
-    return 1;
 
-return 0;
-}
-/*}}}*/
-//--------------------------------------------------
-ISR(USART1_RX_vect)/*{{{*/
-{
-char rcv=UDR1;
-hc05_buff[hc05_i]=rcv;
-
-hc05_i++;
-if(rcv == '\n' ||
-   rcv == '\r')
-    {
-    buff_fill=hc05_i;
-    hc05_i=0;
-    }
+if(to >= max_to)
+    return false;
+else
+    return true;
 }
 /*}}}*/
 //--------------------------------------------------

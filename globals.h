@@ -7,5 +7,8 @@
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 
+//--------------------------------------------------
+#define HALT while(1) {}
+
 #endif
 //--------------------------------------------------

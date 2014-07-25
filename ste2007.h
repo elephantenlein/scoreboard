@@ -13,6 +13,7 @@ extern char framebuffer[96*9];
 extern void ste_init(void);
 extern void ste_pack(const char *);
 extern void ste_render(void);
+extern void ste_light(uint8_t);
 
 #endif
 //--------------------------------------------------
